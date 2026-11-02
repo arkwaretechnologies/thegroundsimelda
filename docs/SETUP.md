@@ -7,6 +7,7 @@
 3. Apply your schema migrations (from the shared backend), then run the House No 14 seed:
 
    - `supabase/migrations/20261102000001_house_no_14_seed.sql`
+   - `supabase/migrations/20261102070000_member_api_grants.sql`
 
 4. Confirm seed branch id matches env:
 
