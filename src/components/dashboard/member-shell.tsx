@@ -79,20 +79,14 @@ export function MemberShell({
   }, []);
 
   return (
-    <div className="max-md:h-[100dvh] max-md:overflow-hidden md:min-h-screen md:w-full">
-      <div className="max-md:member-mobile-viewport md:contents">
-        <div
-          className={cn(
-            "max-md:member-app-frame max-md:flex max-md:flex-col max-md:overflow-hidden",
-            "md:flex md:min-h-screen md:w-full md:max-w-none md:gap-5 md:px-4 md:py-5",
-            "md:shadow-none lg:gap-8 lg:px-8 lg:py-6"
-          )}
-        >
-          <header className="shrink-0 border-b border-white/40 px-4 py-3 md:hidden">
+    <div className="member-shell-root">
+      <div className="member-shell-viewport">
+        <div className="member-shell-frame">
+          <header className="member-shell-header">
             <BrandHeader name={name} avatarUrl={avatarUrl} email={email} />
           </header>
 
-          <aside className="glass hidden h-fit w-56 shrink-0 flex-col rounded-2xl p-3 md:sticky md:top-5 md:flex lg:w-64">
+          <aside className="member-shell-sidebar glass">
             <BrandHeader
               name={name}
               avatarUrl={avatarUrl}
@@ -121,11 +115,9 @@ export function MemberShell({
             </nav>
           </aside>
 
-          <div className="member-app-scroll min-w-0 flex-1 px-4 py-3 md:overflow-visible md:px-0 md:py-0">
-            {children}
-          </div>
+          <div className="member-shell-main">{children}</div>
 
-          <nav className="member-bottom-nav shrink-0 border-t border-white/40 bg-white/55 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
+          <nav className="member-shell-bottom-nav member-bottom-nav">
             <ul className="flex items-stretch justify-between gap-0.5">
               {NAV.map((item) => {
                 const active = pathname === item.href;
