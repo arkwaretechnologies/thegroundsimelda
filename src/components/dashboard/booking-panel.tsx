@@ -365,7 +365,7 @@ export function BookingPanel({
           </DialogHeader>
 
           {paymentDialogKind === "exclusive" && exclusiveSelection ? (
-            <ul className="space-y-1.5 rounded-2xl bg-white/50 px-4 py-3 text-sm">
+            <ul className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm">
               <li className="flex justify-between gap-3">
                 <span className="text-muted-foreground">Court</span>
                 <span className="text-right font-medium text-pv-ink">
@@ -390,7 +390,7 @@ export function BookingPanel({
           ) : null}
 
           {paymentDialogKind === "open_play" && selectedSession ? (
-            <ul className="space-y-1.5 rounded-2xl bg-white/50 px-4 py-3 text-sm">
+            <ul className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm">
               <li className="flex justify-between gap-3">
                 <span className="text-muted-foreground">Session</span>
                 <span className="text-right font-medium text-pv-ink">
@@ -588,8 +588,8 @@ export function BookingPanel({
                             type="button"
                             className={`w-full touch-manipulation rounded-2xl border px-3 py-3 text-left text-sm transition ${
                               selected
-                                ? "border-primary/50 bg-primary/5"
-                                : "border-border/60 bg-white/40 hover:bg-white/70"
+                                ? "border-[rgba(243,210,122,0.6)] bg-[rgba(212,168,69,0.12)]"
+                                : "border-border bg-black/25 hover:border-[rgba(212,168,69,0.4)] hover:bg-[rgba(212,168,69,0.06)]"
                             }`}
                             onClick={() => setSessionId(s.id)}
                           >
@@ -663,7 +663,7 @@ export function BookingPanel({
           {bookings.map((b) => (
             <li
               key={`b-${b.id}`}
-              className="flex items-center justify-between rounded-2xl bg-white/50 px-4 py-3 text-sm"
+              className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
             >
               <div>
                 <p className="font-medium">{b.courts?.name ?? "Court"}</p>
@@ -677,7 +677,7 @@ export function BookingPanel({
           {registrations.map((r) => (
             <li
               key={`r-${r.id}`}
-              className="flex items-center justify-between rounded-2xl bg-white/50 px-4 py-3 text-sm"
+              className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
             >
               <div>
                 <p className="font-medium">{r.session_title}</p>

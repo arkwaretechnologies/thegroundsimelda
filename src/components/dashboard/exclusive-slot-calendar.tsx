@@ -218,7 +218,7 @@ export function ExclusiveSlotCalendar({
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border border-border/60 bg-white/40 p-3">
+    <div className="space-y-3 rounded-2xl border border-border bg-black/25 p-3">
       <div className="flex items-center justify-between">
         <Button
           type="button"
@@ -245,13 +245,13 @@ export function ExclusiveSlotCalendar({
         </Button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium text-muted-foreground">
+      <div className="mx-auto grid w-full max-w-sm grid-cols-7 gap-1 text-center text-[10px] font-medium text-muted-foreground">
         {WEEKDAYS.map((d) => (
           <span key={d}>{d}</span>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="mx-auto grid w-full max-w-sm grid-cols-7 gap-1">
         {monthCells.map((day, idx) => {
           if (day === null) {
             return <div key={`empty-${idx}`} className="aspect-square" />;
@@ -270,7 +270,7 @@ export function ExclusiveSlotCalendar({
                 !hasSlots && "cursor-not-allowed text-muted-foreground/40",
                 hasSlots &&
                   !selected &&
-                  "bg-white/70 text-pv-ink hover:bg-primary/10",
+                  "border border-white/[0.06] bg-white/[0.03] text-foreground hover:border-[rgba(212,168,69,0.4)] hover:bg-primary/10",
                 selected &&
                   "bg-primary text-primary-foreground shadow-md shadow-primary/20"
               )}
@@ -360,14 +360,14 @@ export function ExclusiveSlotCalendar({
             ) : null}
 
             {availableStarts.length === 0 && daySlots.length > 0 ? (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <p className="rounded-xl border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-200">
                 All start times are booked on this day. Try another date or
                 court.
               </p>
             ) : null}
 
             {conflict && selectedStartSlot ? (
-              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
+              <p className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-300">
                 Can&apos;t book {durationHours}{" "}
                 {durationHours === 1 ? "hour" : "hours"} from{" "}
                 {formatSlotTime(selectedStartSlot.startsAt)} — this court is

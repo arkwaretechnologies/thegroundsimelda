@@ -29,11 +29,13 @@ export function MemberAccountMenu({
   avatarUrl,
   email,
   className,
+  tone = "default",
 }: {
   name?: string | null;
   avatarUrl?: string | null;
   email?: string | null;
   className?: string;
+  tone?: "default" | "dark";
 }) {
   const router = useRouter();
   const displayName = name?.trim() || email || "Member";
@@ -55,11 +57,18 @@ export function MemberAccountMenu({
           className
         )}
       >
-        <Avatar className="h-9 w-9 border-2 border-white/80 shadow-sm ring-1 ring-black/5">
+        <Avatar
+          className={cn(
+            "h-9 w-9 border-2 shadow-sm ring-1",
+            tone === "dark"
+              ? "border-[rgba(212,168,69,0.55)] ring-[rgba(212,168,69,0.15)]"
+              : "border-[rgba(212,168,69,0.55)] ring-black/20"
+          )}
+        >
           {avatarUrl ? (
             <AvatarImage src={avatarUrl} alt={displayName} />
           ) : null}
-          <AvatarFallback className="bg-primary text-xs text-primary-foreground">
+          <AvatarFallback className="bg-gold text-xs font-semibold text-primary-foreground">
             {initials}
           </AvatarFallback>
         </Avatar>

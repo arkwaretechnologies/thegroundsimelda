@@ -75,7 +75,7 @@ export function WalletActivityList({
 
   const rowClass =
     variant === "history"
-      ? "flex justify-between rounded-2xl bg-white/50 px-4 py-3 text-sm"
+      ? "flex justify-between rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
       : "flex items-center justify-between gap-3 py-3 text-sm";
 
   return (
@@ -156,7 +156,7 @@ export function WalletActivityList({
                   onClick={() => openPending(topup.id)}
                   className={cn(
                     rowClass,
-                    "w-full cursor-pointer text-left transition-colors hover:bg-white/40"
+                    "w-full cursor-pointer text-left transition-colors hover:bg-[rgba(212,168,69,0.06)]"
                   )}
                 >
                   {inner}

@@ -16,19 +16,23 @@ export function PageHeader({
   title,
   description,
   action,
+  eyebrow,
 }: {
   title: string;
   description?: string;
   action?: React.ReactNode;
+  eyebrow?: string;
 }) {
   return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-pv-ink sm:text-2xl">
+        {eyebrow ? <p className="eyebrow mb-1.5">{eyebrow}</p> : null}
+        <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
           {title}
         </h1>
+        <div className="gold-rule mt-2.5 max-w-[7rem] text-[7px]">✦</div>
         {description ? (
-          <p className="mt-0.5 max-w-sm text-sm text-muted-foreground">
+          <p className="mt-2.5 max-w-md text-sm text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -48,11 +52,11 @@ export function StatPill({
   hint?: string;
 }) {
   return (
-    <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="glass rounded-2xl px-3.5 py-3.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-pv-ink">
+      <p className="mt-1.5 font-[family-name:var(--font-cinzel)] text-xl font-semibold tabular-nums text-[var(--tg-gold-light)] sm:text-2xl">
         {value}
       </p>
       {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
@@ -68,8 +72,8 @@ export function WalletBadge({ balanceCents }: { balanceCents: number }) {
   }).format(balanceCents / 100);
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-[var(--pv-green-deep)] px-3.5 py-1.5 text-sm font-semibold text-white shadow-md shadow-primary/20">
-      <span className="opacity-80">Wallet</span>
+    <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,168,69,0.4)] bg-[rgba(212,168,69,0.1)] px-3.5 py-1.5 text-sm font-semibold text-[var(--tg-gold-light)]">
+      <span className="text-white/60">Wallet</span>
       <span className="tabular-nums">{formatted}</span>
     </div>
   );

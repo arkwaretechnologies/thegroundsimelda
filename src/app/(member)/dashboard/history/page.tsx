@@ -65,7 +65,7 @@ export default async function HistoryPage() {
               {(attendance ?? []).map((a) => (
                 <li
                   key={a.id}
-                  className="flex justify-between rounded-2xl bg-white/50 px-4 py-3 text-sm"
+                  className="flex justify-between rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
                 >
                   <span className="capitalize">{a.event.replace("_", " ")}</span>
                   <span className="text-muted-foreground">
@@ -89,7 +89,7 @@ export default async function HistoryPage() {
                 return (
                   <li
                     key={b.id}
-                    className="flex justify-between rounded-2xl bg-white/50 px-4 py-3 text-sm"
+                    className="flex justify-between rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm"
                   >
                     <div>
                       <p className="font-medium">{court?.name}</p>

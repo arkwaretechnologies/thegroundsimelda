@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, Syne } from "next/font/google";
+import { Cinzel, Outfit, Syne } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 import "./globals.css";
@@ -7,6 +7,12 @@ import "./globals.css";
 const outfit = Outfit({
   variable: "--font-outfit",
   subsets: ["latin"],
+});
+
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const syne = Syne({
@@ -24,18 +30,21 @@ export const metadata: Metadata = {
   applicationName: BRAND_NAME,
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/favicon.svg",
-    apple: "/icons/icon-192.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black",
     title: BRAND_NAME,
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1faa5a",
+  themeColor: "#0a0a09",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -50,7 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${outfit.variable} ${syne.variable} antialiased`}>
+      <body className={`${outfit.variable} ${syne.variable} ${cinzel.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,4 +1,5 @@
 import { SiteFooter, SiteHeader } from "@/components/marketing/site-chrome";
+import { AuthModalProvider } from "@/components/marketing/auth-modal";
 
 export default function MarketingLayout({
   children,
@@ -6,10 +7,12 @@ export default function MarketingLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
-      <main>{children}</main>
-      <SiteFooter />
-    </div>
+    <AuthModalProvider>
+      <div className="theme-grounds min-h-screen">
+        <SiteHeader />
+        <main>{children}</main>
+        <SiteFooter />
+      </div>
+    </AuthModalProvider>
   );
 }

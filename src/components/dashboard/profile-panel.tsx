@@ -123,7 +123,7 @@ export function ProfilePanel({ initial }: { initial: ProfileFormValues }) {
   return (
     <div className="glass w-full space-y-4 rounded-2xl p-4">
       <div className="flex items-center gap-4">
-        <Avatar className="h-20 w-20 border-2 border-white/80 shadow-md">
+        <Avatar className="h-20 w-20 border-2 border-[rgba(212,168,69,0.6)] shadow-[0_0_0_4px_rgba(212,168,69,0.1)]">
           {avatarUrl ? <AvatarImage src={avatarUrl} alt={fullName || "Member"} /> : null}
           <AvatarFallback className="text-lg">{initials}</AvatarFallback>
         </Avatar>

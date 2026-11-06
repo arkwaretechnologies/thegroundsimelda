@@ -1,10 +1,10 @@
--- House No 14 baseline seed (idempotent)
+-- The Grounds baseline seed (idempotent)
 -- Matches NEXT_PUBLIC_DEFAULT_BRANCH_ID=39ff10ae-f2c4-42e8-9548-54c25a8af434
 
 INSERT INTO public.branches (id, name, slug, timezone, settings, is_active)
 VALUES (
   '39ff10ae-f2c4-42e8-9548-54c25a8af434',
-  'House No 14',
+  'The Grounds',
   'main',
   'Asia/Manila',
   '{}'::jsonb,

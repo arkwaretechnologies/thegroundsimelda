@@ -1,6 +1,6 @@
-# House No 14 (Member App)
+# The Grounds (Member App)
 
-Member-facing Progressive Web App for **House No 14** — membership, wallet, and court booking.
+Member-facing Progressive Web App for **The Grounds** — membership, wallet, and court booking.
 
 **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind CSS · shadcn/ui · Framer Motion · Supabase · Vercel
 
@@ -32,7 +32,7 @@ npm run dev
 
 3. Apply SQL migrations in the Supabase SQL editor (schema from your source project, then):
 
-- `supabase/migrations/20261102000001_house_no_14_seed.sql`
+- `supabase/migrations/20261102000001_the_grounds_seed.sql`
 
 4. Enable Google provider in Supabase Auth (optional) and add redirect URL:
    `http://localhost:3000/auth/callback`

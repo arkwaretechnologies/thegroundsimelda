@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -8,19 +9,19 @@ import {
   Wallet,
   CalendarDays,
   History,
-  Bell,
+  Crown,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MemberAccountMenu } from "@/components/dashboard/member-account-menu";
-import { BRAND_WORDMARK } from "@/lib/brand";
+import { BRAND_LOGO_SRC, BRAND_NAME } from "@/lib/brand";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
-  { href: "/dashboard/membership", label: "Membership", icon: Bell },
+  { href: "/dashboard/membership", label: "Membership", icon: Crown },
   { href: "/dashboard/history", label: "History", icon: History },
 ];
 
@@ -29,24 +30,36 @@ function BrandHeader({
   avatarUrl,
   email,
   className,
+  tone = "default",
 }: {
   name?: string | null;
   avatarUrl?: string | null;
   email?: string | null;
   className?: string;
+  tone?: "default" | "dark";
 }) {
   return (
     <div className={cn("flex items-center justify-between gap-3", className)}>
-      <div className="min-w-0">
-        <Link href="/" className="text-base font-semibold tracking-tight">
-          {BRAND_WORDMARK.primary}{" "}
-          <span className="text-primary">{BRAND_WORDMARK.accent}</span>
-        </Link>
-        <p className="truncate text-xs text-muted-foreground">
-          {name ?? "Member"}
-        </p>
-      </div>
-      <MemberAccountMenu name={name} avatarUrl={avatarUrl} email={email} />
+      <Link
+        href="/"
+        className="flex shrink-0 items-center"
+        aria-label={`${BRAND_NAME} home`}
+      >
+        <Image
+          src={BRAND_LOGO_SRC}
+          alt=""
+          width={132}
+          height={48}
+          priority
+          className={tone === "dark" ? "h-9 w-auto" : "h-11 w-auto"}
+        />
+      </Link>
+      <MemberAccountMenu
+        name={name}
+        avatarUrl={avatarUrl}
+        email={email}
+        tone="dark"
+      />
     </div>
   );
 }
@@ -83,7 +96,12 @@ export function MemberShell({
       <div className="member-shell-viewport">
         <div className="member-shell-frame">
           <header className="member-shell-header">
-            <BrandHeader name={name} avatarUrl={avatarUrl} email={email} />
+            <BrandHeader
+              name={name}
+              avatarUrl={avatarUrl}
+              email={email}
+              tone="dark"
+            />
           </header>
 
           <aside className="member-shell-sidebar glass">
@@ -91,22 +109,32 @@ export function MemberShell({
               name={name}
               avatarUrl={avatarUrl}
               email={email}
-              className="items-start"
             />
-            <nav className="mt-4 space-y-1">
+            <div className="gold-rule my-4 text-[8px]">✦</div>
+            <p className="truncate px-1 text-xs text-muted-foreground">
+              Signed in as
+            </p>
+            <p className="truncate px-1 text-sm font-semibold text-[var(--tg-gold-light)]">
+              {name ?? "Member"}
+            </p>
+            <nav className="mt-5 space-y-1">
               {NAV.map((item) => {
                 const active = pathname === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition",
+                      "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
                       active
-                        ? "bg-primary text-white shadow-md shadow-primary/25"
-                        : "text-pv-muted hover:bg-white/60 hover:text-pv-ink"
+                        ? "bg-[rgba(212,168,69,0.14)] text-[var(--tg-gold-light)]"
+                        : "text-white/60 hover:bg-white/[0.04] hover:text-white"
                     )}
                   >
+                    {active ? (
+                      <span className="bg-gold absolute inset-y-2 left-0 w-[3px] rounded-full" />
+                    ) : null}
                     <item.icon className="h-4 w-4 shrink-0" />
                     {item.label}
                   </Link>
@@ -125,13 +153,15 @@ export function MemberShell({
                   <li key={item.href} className="min-w-0 flex-1">
                     <Link
                       href={item.href}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[9px] font-medium leading-tight transition sm:text-[10px]",
-                        active
-                          ? "bg-primary/15 text-primary"
-                          : "text-pv-muted"
+                        "relative flex flex-col items-center gap-1 rounded-xl px-0.5 py-1.5 text-[9px] font-medium leading-tight transition sm:text-[10px]",
+                        active ? "text-[var(--tg-gold-light)]" : "text-white/50"
                       )}
                     >
+                      {active ? (
+                        <span className="bg-gold absolute -top-[0.45rem] h-[2px] w-6 rounded-full" />
+                      ) : null}
                       <item.icon className="h-5 w-5 shrink-0" />
                       <span className="max-w-full truncate">{item.label}</span>
                     </Link>

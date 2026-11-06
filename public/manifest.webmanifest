@@ -1,11 +1,11 @@
 {
-  "name": "House No 14",
-  "short_name": "House No 14",
+  "name": "The Grounds",
+  "short_name": "The Grounds",
   "description": "Smart membership & court management",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#e8f6ee",
-  "theme_color": "#1faa5a",
+  "background_color": "#0a0a09",
+  "theme_color": "#0a0a09",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -16,6 +16,12 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

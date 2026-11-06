@@ -2,7 +2,7 @@
 
 ## Overview
 
-**House No 14** member app is a Next.js 15 App Router PWA backed by Supabase (Postgres, Auth, Realtime). Money mutations run as Postgres RPCs for atomicity under RLS.
+**The Grounds** member app is a Next.js 15 App Router PWA backed by Supabase (Postgres, Auth, Realtime). Money mutations run as Postgres RPCs for atomicity under RLS.
 
 Staff admin, Open Play console, and Live TV are intended as a **separate frontend** on the same Supabase project.
 
