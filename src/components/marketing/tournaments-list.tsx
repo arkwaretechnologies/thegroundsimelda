@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Trophy, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { Spotlight } from "@/components/motion/primitives";
 import type { PublicTournament } from "@/lib/marketing/public-schedule";
 
 const MANILA = "Asia/Manila";
@@ -89,8 +90,9 @@ export function TournamentsList({ tournaments }: { tournaments: PublicTournament
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: i * 0.08 }}
-            className="glass flex flex-col overflow-hidden rounded-2xl"
+            className="glass overflow-hidden rounded-2xl transition-colors duration-500 hover:border-[rgba(212,168,69,0.45)]"
           >
+            <Spotlight className="flex h-full flex-col rounded-2xl" size={320}>
             <div className="flex items-center gap-4 border-b border-[rgba(212,168,69,0.18)] bg-[linear-gradient(135deg,rgba(15,61,38,0.7),rgba(0,0,0,0.4))] p-5">
               <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl border border-[rgba(212,168,69,0.45)] bg-black/50">
                 {start ? (
@@ -145,6 +147,7 @@ export function TournamentsList({ tournaments }: { tournaments: PublicTournament
                 {t.status === "registration" ? ` · ${left} spots left` : ""}
               </p>
             </div>
+            </Spotlight>
           </motion.article>
         );
       })}

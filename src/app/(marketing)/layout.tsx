@@ -12,6 +12,7 @@ export default function MarketingLayout({
         <SiteHeader />
         <main>{children}</main>
         <SiteFooter />
+        <div aria-hidden className="grain" />
       </div>
     </AuthModalProvider>
   );

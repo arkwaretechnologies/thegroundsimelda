@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { skillLevelSchema } from "@/lib/skill-level";
 import { genderSchema } from "@/lib/gender";
+import { DEFAULT_BRANCH_ID } from "@/lib/types/database";
 
 const PROFILE_SELECT =
   "id, full_name, phone, address, club, avatar_url, role, branch_id, gender, skill_level, elo_rating, created_at, updated_at";
@@ -88,8 +89,29 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // No row yet (e.g. signup without a trigger) — insert on first save.
   if (!data) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    const now = patch.updated_at as string;
+    const insertRow = {
+      id: user.id,
+      branch_id: DEFAULT_BRANCH_ID,
+      role: "member" as const,
+      elo_rating: 0,
+      created_at: now,
+      ...patch,
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("profiles")
+      .insert(insertRow)
+      .select(PROFILE_SELECT)
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 400 });
+    }
+    return NextResponse.json({ profile: inserted });
   }
 
   return NextResponse.json({ profile: data });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_BRANCH_ID } from "@/lib/types/database";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -74,16 +75,35 @@ export async function POST(request: Request) {
   // Bust CDN/browser cache after replace
   const avatarUrl = `${publicUrl}?v=${Date.now()}`;
 
-  const { error: updateError } = await supabase
+  const now = new Date().toISOString();
+  const { data: updatedRows, error: updateError } = await supabase
     .from("profiles")
     .update({
       avatar_url: avatarUrl,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("id");
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 400 });
+  }
+
+  if (!updatedRows?.length) {
+    const { error: insertError } = await supabase.from("profiles").insert({
+      id: user.id,
+      branch_id: DEFAULT_BRANCH_ID,
+      role: "member",
+      elo_rating: 0,
+      avatar_url: avatarUrl,
+      full_name: user.user_metadata?.full_name ?? user.email ?? null,
+      created_at: now,
+      updated_at: now,
+    });
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 400 });
+    }
   }
 
   return NextResponse.json({ avatar_url: avatarUrl });

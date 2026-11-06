@@ -34,8 +34,19 @@ export function SiteHeader() {
       description: "Sign in to your member account.",
     });
 
+  const [hidden, setHidden] = useState(false);
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 8);
+      // Hide while scrolling down past the hero edge, reveal on any scroll up.
+      if (Math.abs(y - lastY) > 6) {
+        setHidden(y > lastY && y > 160);
+        lastY = y;
+      }
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -51,7 +62,8 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-b transition-colors duration-300",
+        "sticky top-0 z-40 border-b transition-[transform,background-color,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        hidden && !open ? "-translate-y-full" : "translate-y-0",
         scrolled || open
           ? "border-[rgba(212,168,69,0.22)] bg-black/90 backdrop-blur-md"
           : "border-transparent bg-black"
