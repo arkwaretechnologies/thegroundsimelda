@@ -76,7 +76,7 @@ Debits wallet and activates membership.
 
 ### `POST /api/bookings`
 
-Exclusive court only. Open Play uses registration below. The bookings page lists exclusive courts with `status = available` only.
+Exclusive court only. Open Play uses registration below. The bookings page lists exclusive courts with `status = available` only. Concurrent requests for the same court/time return a friendly **already booked** error; Postgres enforces one confirmed exclusive booking per court slot.
 
 ```json
 {
@@ -85,6 +85,18 @@ Exclusive court only. Open Play uses registration below. The bookings page lists
   "ends_at": "ISO-8601"
 }
 ```
+
+### `GET /api/courts/availability?date=YYYY-MM-DD`
+
+Public read (service role when available). Returns per-hour aggregates for the Manila calendar day: free, booked, and closed court counts from confirmed bookings and `court_schedule_blocks`.
+
+### `GET /api/bookings/availability`
+
+Auth required. Live snapshot for Book a court: `court_occupancy` (confirmed exclusive bookings) and `court_blocks` (staff closures, no reason). Refreshed before pay in the booking dialog.
+
+### Staff reservations (Admin is source of truth)
+
+Closures, walk-ins, and `exclusive_open_hour` / `exclusive_close_hour` are managed in **The Grounds Admin** (`POST /api/reservations/blocks`, etc.). The member app still ships legacy `/api/staff/*` routes for emergencies; staff should use Admin (`NEXT_PUBLIC_ADMIN_APP_URL`).
 
 ### `GET /api/open-play/sessions?date=YYYY-MM-DD`
 
@@ -143,6 +155,11 @@ Response includes `queue_id`, `fee_charged_cents`, `matches_created`.
 | `wallet_debit` | Debit with balance check |
 | `purchase_membership` | Buy plan |
 | `create_booking` | Book court + debit |
+| `staff_create_booking` | Walk-in court hold (staff) |
+| `staff_set_court_blocks` | Close selected hours |
+| `staff_close_court_day` | Close operating hours for one court/day |
+| `staff_delete_court_blocks` | Remove closures |
+| `staff_update_exclusive_hours` | Branch open/close hours |
 | `rfid_scan` | Full scan pipeline |
 | `open_play_session_set` | Open/close session (admin app) |
 | `try_matchmake` | Form matches (admin app) |

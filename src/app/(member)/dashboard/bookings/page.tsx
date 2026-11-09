@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveMemberBranchId } from "@/lib/branch";
 import { PageHeader } from "@/components/shared/glass";
 import { BookingPanel } from "@/components/dashboard/booking-panel";
+import { fetchCourtScheduleSnapshot } from "@/lib/booking/fetch-court-schedule";
 
 export const metadata = { title: "Bookings" };
 
@@ -12,57 +13,36 @@ export default async function BookingsPage() {
   } = await supabase.auth.getUser();
 
   const branchId = await resolveMemberBranchId(supabase, user!.id);
-  const nowIso = new Date().toISOString();
 
-  // Exclusive courts: available only (occupied/maintenance hidden).
-  const [
-    { data: exclusiveCourts },
-    { data: courtOccupancy },
-    { data: bookings },
-    { data: settings },
-    { data: wallet },
-    { data: myRegistrations },
-  ] = await Promise.all([
-    supabase
-      .from("courts")
-      .select("id, name, status")
-      .eq("branch_id", branchId)
-      .eq("is_exclusive", true)
-      .eq("status", "available")
-      .order("sort_order"),
-    supabase
-      .from("bookings")
-      .select("court_id, starts_at, ends_at, status")
-      .eq("branch_id", branchId)
-      .eq("type", "exclusive")
-      .eq("status", "confirmed")
-      .gte("ends_at", nowIso),
-    supabase
-      .from("bookings")
-      .select("*, courts(name)")
-      .eq("profile_id", user!.id)
-      .order("starts_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("branch_settings")
-      .select(
-        "exclusive_court_fee_cents, default_open_play_fee_cents, exclusive_open_hour, exclusive_close_hour"
-      )
-      .eq("branch_id", branchId)
-      .maybeSingle(),
-    supabase
-      .from("wallets")
-      .select("balance_cents")
-      .eq("profile_id", user!.id)
-      .maybeSingle(),
-    supabase
-      .from("open_play_registrations")
-      .select("id, status, fee_cents, session_id, open_play_sessions(title, starts_at)")
-      .eq("profile_id", user!.id)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(20),
-  ]);
+  const snapshot = await fetchCourtScheduleSnapshot(supabase, branchId);
+
+  const exclusiveCourts = snapshot.courts.filter(
+    (c) => (c.status ?? "available") === "available"
+  );
+
+  const [{ data: bookings }, { data: wallet }, { data: myRegistrations }] =
+    await Promise.all([
+      supabase
+        .from("bookings")
+        .select("*, courts(name)")
+        .eq("profile_id", user!.id)
+        .order("starts_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("wallets")
+        .select("balance_cents")
+        .eq("profile_id", user!.id)
+        .maybeSingle(),
+      supabase
+        .from("open_play_registrations")
+        .select(
+          "id, status, fee_cents, session_id, open_play_sessions(title, starts_at)"
+        )
+        .eq("profile_id", user!.id)
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
 
   return (
     <div>
@@ -71,9 +51,18 @@ export default async function BookingsPage() {
         description="Reserve exclusive time or register for Open Play schedules."
       />
       <BookingPanel
-        exclusiveCourts={exclusiveCourts ?? []}
-        courtOccupancy={(courtOccupancy ?? []).map((row) => ({
-          court_id: row.court_id,
+        exclusiveCourts={exclusiveCourts.map((c) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status ?? "available",
+        }))}
+        courtOccupancy={snapshot.bookings.map((row) => ({
+          court_id: row.court_id!,
+          starts_at: row.starts_at,
+          ends_at: row.ends_at,
+        }))}
+        courtBlocks={snapshot.blocks.map((row) => ({
+          court_id: row.court_id!,
           starts_at: row.starts_at,
           ends_at: row.ends_at,
         }))}
@@ -101,10 +90,10 @@ export default async function BookingsPage() {
             starts_at: session?.starts_at ?? new Date().toISOString(),
           };
         })}
-        exclusiveFeeCents={settings?.exclusive_court_fee_cents ?? 50000}
-        openPlayFeeCents={settings?.default_open_play_fee_cents ?? 15000}
-        exclusiveOpenHour={settings?.exclusive_open_hour ?? 6}
-        exclusiveCloseHour={settings?.exclusive_close_hour ?? 22}
+        exclusiveFeeCents={snapshot.exclusiveFeeCents}
+        openPlayFeeCents={snapshot.openPlayFeeCents}
+        exclusiveOpenHour={snapshot.openHour}
+        exclusiveCloseHour={snapshot.closeHour}
         walletBalanceCents={wallet?.balance_cents ?? 0}
       />
     </div>

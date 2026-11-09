@@ -101,6 +101,7 @@ export type Booking = {
   ends_at: string;
   status: BookingStatus;
   fee_cents: number;
+  walk_in_label?: string | null;
   created_at: string;
 };
 

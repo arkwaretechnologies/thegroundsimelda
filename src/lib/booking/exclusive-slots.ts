@@ -2,6 +2,9 @@ import { addHours } from "date-fns";
 
 const MANILA = "Asia/Manila";
 
+/** How far ahead members (and public schedule) can book exclusive courts. */
+export const BOOKING_DAYS_AHEAD = 90;
+
 export type ExclusiveSlot = {
   id: string;
   label: string;
@@ -58,7 +61,7 @@ export function groupExclusiveSlotsByDate(
 export function buildExclusiveSlots(
   openHour: number,
   closeHour: number,
-  daysAhead = 14
+  daysAhead = BOOKING_DAYS_AHEAD
 ): ExclusiveSlot[] {
   const hoursPerDay = Math.max(0, closeHour - openHour);
   const maxSlots = hoursPerDay * daysAhead;

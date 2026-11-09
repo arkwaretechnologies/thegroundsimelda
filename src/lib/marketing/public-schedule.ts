@@ -7,6 +7,7 @@ import {
   listMemberOpenPlaySessions,
   sessionCourtNames,
 } from "@/lib/open-play/sessions";
+import { BOOKING_DAYS_AHEAD } from "@/lib/booking/exclusive-slots";
 
 /**
  * Public, anonymised schedule data for the marketing page.
@@ -16,6 +17,8 @@ export type PublicSchedule = {
   courts: { id: string; name: string }[];
   /** Confirmed exclusive bookings (court + time range only). */
   busy: { court_id: string; starts_at: string; ends_at: string }[];
+  /** Staff closures (court + time range only). */
+  blocks: { court_id: string; starts_at: string; ends_at: string }[];
   sessions: {
     id: string;
     title: string;
@@ -44,8 +47,6 @@ export type PublicTournament = {
   registered: number;
 };
 
-const DAYS_AHEAD = 7;
-
 async function getReader(): Promise<SupabaseClient> {
   try {
     return createAdminClient();
@@ -58,6 +59,7 @@ async function getReader(): Promise<SupabaseClient> {
 const EMPTY_SCHEDULE: PublicSchedule = {
   courts: [],
   busy: [],
+  blocks: [],
   sessions: [],
   openHour: 6,
   closeHour: 22,
@@ -70,9 +72,11 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
     const supabase = await getReader();
     const branchId = DEFAULT_BRANCH_ID;
     const now = new Date();
-    const until = new Date(now.getTime() + (DAYS_AHEAD + 1) * 86400000);
+    const until = new Date(
+      now.getTime() + (BOOKING_DAYS_AHEAD + 1) * 86400000
+    );
 
-    const [courtsRes, busyRes, settingsRes, sessionRows] = await Promise.all([
+    const [courtsRes, busyRes, blocksRes, settingsRes, sessionRows] = await Promise.all([
       supabase
         .from("courts")
         .select("id, name")
@@ -86,6 +90,12 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
         .eq("branch_id", branchId)
         .eq("type", "exclusive")
         .eq("status", "confirmed")
+        .gte("ends_at", now.toISOString())
+        .lt("starts_at", until.toISOString()),
+      supabase
+        .from("court_schedule_blocks")
+        .select("court_id, starts_at, ends_at")
+        .eq("branch_id", branchId)
         .gte("ends_at", now.toISOString())
         .lt("starts_at", until.toISOString()),
       supabase
@@ -121,6 +131,7 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
     return {
       courts: courtsRes.data ?? [],
       busy: busyRes.data ?? [],
+      blocks: blocksRes.error ? [] : blocksRes.data ?? [],
       sessions: sessions.map((row) => ({
         id: row.id,
         title: row.title ?? "Open Play",

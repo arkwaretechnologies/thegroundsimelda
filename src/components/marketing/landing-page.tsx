@@ -268,7 +268,7 @@ export function LandingPage({
                 className="mx-auto mt-6 max-w-md text-balance text-base leading-relaxed text-white/80 sm:text-lg lg:mx-0"
               >
                 Courts, coffee and cocktails under one roof. Book your court,
-                manage your membership and wallet — all from your phone.
+                top up your wallet, and check the schedule — all from your phone.
               </motion.p>
             </div>
 

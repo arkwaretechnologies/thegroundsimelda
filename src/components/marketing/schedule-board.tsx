@@ -1,13 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Clock, MapPin, Moon, Sun, Sunrise, Users } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  MapPin,
+  Moon,
+  Sun,
+  Sunrise,
+  Users,
+} from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useMemberGate } from "@/components/marketing/auth-modal";
 import type { PublicSchedule } from "@/lib/marketing/public-schedule";
+import { buildHourAggregates } from "@/lib/booking/court-availability";
+import { BOOKING_DAYS_AHEAD } from "@/lib/booking/exclusive-slots";
+import { Button } from "@/components/ui/button";
 
 const MANILA = "Asia/Manila";
-const DAYS = 7;
 
 type Mode = "court" | "openplay";
 
@@ -23,49 +35,146 @@ function fmtTime(d: Date) {
   });
 }
 
-function slotStart(dayKey: string, hour: number) {
-  return new Date(`${dayKey}T${String(hour).padStart(2, "0")}:00:00+08:00`);
-}
-
-function overlaps(aS: Date, aE: Date, bS: Date, bE: Date) {
-  return aS < bE && aE > bS;
-}
-
 const PERIODS = [
   { label: "Morning", icon: Sunrise, from: 0, to: 12 },
   { label: "Afternoon", icon: Sun, from: 12, to: 17 },
   { label: "Evening", icon: Moon, from: 17, to: 24 },
 ] as const;
 
+function manilaParts(date: Date) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: MANILA,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = fmt.formatToParts(date);
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
+function monthTitle(year: number, month: number) {
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleString("en-PH", {
+    timeZone: MANILA,
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function dateKey(year: number, month: number, day: number) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+function maxBookableKey(from: Date) {
+  const end = new Date(from.getTime() + BOOKING_DAYS_AHEAD * 86400000);
+  return manilaKey(end);
+}
+
+function bookableDaysForMonth(
+  viewYear: number,
+  viewMonth: number,
+  todayKey: string,
+  lastKey: string
+) {
+  const daysInMonth = new Date(Date.UTC(viewYear, viewMonth, 0)).getUTCDate();
+  const out: {
+    key: string;
+    weekday: string;
+    date: string;
+    month: string;
+    isToday: boolean;
+  }[] = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = dateKey(viewYear, viewMonth, d);
+    if (key < todayKey || key > lastKey) continue;
+    const noon = new Date(Date.UTC(viewYear, viewMonth - 1, d, 12));
+    out.push({
+      key,
+      isToday: key === todayKey,
+      weekday:
+        key === todayKey
+          ? "Today"
+          : noon.toLocaleDateString("en-PH", {
+              timeZone: MANILA,
+              weekday: "short",
+            }),
+      date: noon.toLocaleDateString("en-PH", {
+        timeZone: MANILA,
+        day: "numeric",
+      }),
+      month: noon.toLocaleDateString("en-PH", {
+        timeZone: MANILA,
+        month: "short",
+      }),
+    });
+  }
+  return out;
+}
+
 export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
   const { go, checking } = useMemberGate();
-  const [mode, setMode] = useState<Mode>("court");
+  const [mode, setMode] = useState<Mode>("openplay");
   // "now" is only known on the client — avoids SSR/CSR mismatch.
   const [now, setNow] = useState<Date | null>(null);
   const [day, setDay] = useState<string | null>(null);
+  const [viewYear, setViewYear] = useState<number | null>(null);
+  const [viewMonth, setViewMonth] = useState<number | null>(null);
 
   useEffect(() => {
     const n = new Date();
+    const { year, month } = manilaParts(n);
     setNow(n);
     setDay(manilaKey(n));
+    setViewYear(year);
+    setViewMonth(month);
   }, []);
 
+  const todayKey = now ? manilaKey(now) : "";
+  const lastBookableKey = now ? maxBookableKey(now) : "";
+
   const days = useMemo(() => {
-    if (!now) return [];
-    return Array.from({ length: DAYS }, (_, i) => {
-      const d = new Date(now.getTime() + i * 86400000);
-      const key = manilaKey(d);
-      return {
-        key,
-        weekday:
-          i === 0
-            ? "Today"
-            : d.toLocaleDateString("en-PH", { timeZone: MANILA, weekday: "short" }),
-        date: d.toLocaleDateString("en-PH", { timeZone: MANILA, day: "numeric" }),
-        month: d.toLocaleDateString("en-PH", { timeZone: MANILA, month: "short" }),
-      };
-    });
-  }, [now]);
+    if (!viewYear || !viewMonth || !todayKey) return [];
+    return bookableDaysForMonth(
+      viewYear,
+      viewMonth,
+      todayKey,
+      lastBookableKey
+    );
+  }, [viewYear, viewMonth, todayKey, lastBookableKey]);
+
+  const canGoPrevMonth = useMemo(() => {
+    if (!now || !viewYear || !viewMonth) return false;
+    const { year, month } = manilaParts(now);
+    return viewYear > year || (viewYear === year && viewMonth > month);
+  }, [now, viewYear, viewMonth]);
+
+  const canGoNextMonth = useMemo(() => {
+    if (!now || !viewYear || !viewMonth) return false;
+    const last = manilaParts(
+      new Date(now.getTime() + BOOKING_DAYS_AHEAD * 86400000)
+    );
+    return (
+      viewYear < last.year ||
+      (viewYear === last.year && viewMonth < last.month)
+    );
+  }, [now, viewYear, viewMonth]);
+
+  useEffect(() => {
+    if (!days.length || !day) return;
+    if (!days.some((d) => d.key === day)) {
+      setDay(days[0].key);
+    }
+  }, [days, day]);
+
+  function shiftMonth(delta: number) {
+    if (!viewYear || !viewMonth) return;
+    const d = new Date(Date.UTC(viewYear, viewMonth - 1 + delta, 1));
+    setViewYear(d.getUTCFullYear());
+    setViewMonth(d.getUTCMonth() + 1);
+  }
 
   const sessionsByDay = useMemo(() => {
     const map = new Map<string, PublicSchedule["sessions"]>();
@@ -79,22 +188,15 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
 
   const slots = useMemo(() => {
     if (!now || !day) return [];
-    const out: { start: Date; hour: number; free: number }[] = [];
-    for (let h = schedule.openHour; h < schedule.closeHour; h++) {
-      const start = slotStart(day, h);
-      if (start <= now) continue;
-      const end = new Date(start.getTime() + 3600000);
-      const free = schedule.courts.filter(
-        (c) =>
-          !schedule.busy.some(
-            (b) =>
-              b.court_id === c.id &&
-              overlaps(start, end, new Date(b.starts_at), new Date(b.ends_at))
-          )
-      ).length;
-      out.push({ start, hour: h, free });
-    }
-    return out;
+    return buildHourAggregates({
+      dayKey: day,
+      openHour: schedule.openHour,
+      closeHour: schedule.closeHour,
+      courts: schedule.courts,
+      bookings: schedule.busy,
+      blocks: schedule.blocks ?? [],
+      now,
+    });
   }, [now, day, schedule]);
 
   const daySessions = (day && sessionsByDay.get(day)) || [];
@@ -129,8 +231,8 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
         >
           {(
             [
-              ["court", "Court booking"],
               ["openplay", "Open Play"],
+              ["court", "BOOK A COURT"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -169,15 +271,45 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
         </p>
       </div>
 
-      {/* Date strip */}
-      <div className="no-scrollbar relative -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
+      {/* Month + date strip */}
+      <div className="mt-6 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 text-[#f3d27a] hover:bg-white/10"
+            disabled={!canGoPrevMonth}
+            aria-label="Previous month"
+            onClick={() => shiftMonth(-1)}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <p className="text-center font-[family-name:var(--font-cinzel)] text-sm font-semibold tracking-wide text-[#f3d27a] sm:text-base">
+            {viewYear && viewMonth ? monthTitle(viewYear, viewMonth) : "—"}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 text-[#f3d27a] hover:bg-white/10"
+            disabled={!canGoNextMonth}
+            aria-label="Next month"
+            onClick={() => shiftMonth(1)}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
+        <p className="text-center text-[0.7rem] text-muted-foreground">
+          Book up to {BOOKING_DAYS_AHEAD} days ahead
+        </p>
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         {days.length === 0
-          ? Array.from({ length: DAYS }).map((_, i) => (
-              <div
-                key={i}
-                className="h-[4.5rem] min-w-[4.25rem] animate-pulse rounded-2xl bg-white/5"
-              />
-            ))
+          ? (
+            <p className="w-full py-4 text-center text-sm text-muted-foreground">
+              No bookable days in this month — try another month.
+            </p>
+          )
           : days.map((d) => {
               const active = d.key === day;
               const hasOpenPlay = sessionsByDay.has(d.key);
@@ -209,6 +341,7 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
                 </button>
               );
             })}
+        </div>
       </div>
 
       {/* Body */}
@@ -246,6 +379,7 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                       {list.map((s) => {
                         const full = s.free === 0;
+                        const statusLabel = full ? "Reserved" : "Available";
                         return (
                           <button
                             key={s.hour}
@@ -253,7 +387,7 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
                             disabled={full || checking}
                             onClick={bookCourt}
                             aria-haspopup="dialog"
-                            aria-label={`${fmtTime(s.start)} — ${full ? "fully booked" : `${s.free} of ${totalCourts} courts free`}`}
+                            aria-label={`${fmtTime(s.start)} — ${statusLabel}`}
                             className={cn(
                               "group flex flex-col items-center rounded-xl border px-2 py-3 text-center transition",
                               full
@@ -272,10 +406,12 @@ export function ScheduleBoard({ schedule }: { schedule: PublicSchedule }) {
                             <span
                               className={cn(
                                 "mt-1 text-[0.7rem]",
-                                full ? "" : s.free === totalCourts ? "text-emerald-300/80" : "text-[#f3d27a]/80"
+                                full
+                                  ? "text-white/40"
+                                  : "text-emerald-300/80"
                               )}
                             >
-                              {full ? "Booked" : `${s.free}/${totalCourts} free`}
+                              {statusLabel}
                             </span>
                           </button>
                         );

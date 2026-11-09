@@ -8,6 +8,10 @@
 
    - `supabase/migrations/20261102000001_the_grounds_seed.sql`
    - `supabase/migrations/20261102070000_member_api_grants.sql`
+   - `supabase/migrations/20261109120000_court_schedule_blocks.sql` (court closures, walk-ins, overlap rules)
+   - `supabase/migrations/20261110140000_create_booking_debit_after_insert.sql` (FCFS: book row before wallet debit)
+   - `supabase/migrations/20261110141500_create_booking_single_overload.sql` (drop duplicate `create_booking` signature)
+   - `supabase/migrations/20261110143000_create_booking_fee_by_duration.sql` (fee = hourly rate × hours)
 
 4. Confirm seed branch id matches env:
 
@@ -39,7 +43,42 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Sign up, then open `/dashboard`.
 
-## 4. RFID scan test
+Set `NEXT_PUBLIC_ADMIN_APP_URL` to your Admin deployment (same Supabase project as this app). Staff see **Reservations** in the nav, linking to Admin `/reservations`.
+
+## 4. Member app and Admin (shared Supabase)
+
+Use the **same** `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in both repos (ref `oydwidfkzimrtoocraoh`). Branch id: `NEXT_PUBLIC_DEFAULT_BRANCH_ID=39ff10ae-f2c4-42e8-9548-54c25a8af434` or per-user `resolveMemberBranchId`.
+
+| Data | Admin | Member |
+|------|-------|--------|
+| Operating hours | Settings → Pricing | `branch_settings` on Book a court |
+| Closures | Reservations week grid | `court_schedule_blocks` (times only) |
+| Walk-ins | Reservations | Confirmed `bookings` (no `walk_in_label` in member UI) |
+| Member book | — | `POST /api/bookings` → `create_booking` (insert then wallet debit; FCFS) |
+
+**Studio SQL smoke checks** (after migrations):
+
+```sql
+SELECT 1 FROM public.court_schedule_blocks LIMIT 1;
+SELECT public.court_slot_blocked(
+  (SELECT id FROM courts WHERE is_exclusive LIMIT 1),
+  now(), now() + interval '1 hour'
+);
+SELECT pg_get_functiondef(
+  'public.create_booking(uuid,timestamptz,timestamptz,booking_type,gender,skill_level)'::regprocedure
+);
+```
+
+Confirm `create_booking` inserts the booking **before** `wallet_debit` and handles `exclusion_violation` → `court_booked`.
+
+**Parity tests**
+
+1. Admin: close one hour tomorrow on Court 1 (note “Test”) → member exclusive calendar shows slot unavailable; pay never succeeds.
+2. Member books an open hour → Admin week cell shows Booked (member name).
+3. Admin walk-in on an hour → member cannot book that slot.
+4. Two members confirm pay on the same slot at once → one success, one toast: wallet was not charged.
+
+## 5. RFID scan test
 
 With a card assigned in the admin project (or via SQL into `rfid_cards`), an open Open Play session, and wallet balance:
 
@@ -50,7 +89,7 @@ curl -X POST http://localhost:3000/api/rfid/scan \
   -d '{"card_uid":"H14-CARD-001","branch_id":"39ff10ae-f2c4-42e8-9548-54c25a8af434"}'
 ```
 
-## 5. PayMongo (wallet QR top-up)
+## 6. PayMongo (wallet QR top-up)
 
 1. Copy **Secret** and **Public** keys into `.env.local` (`PAYMONGO_SECRET_KEY`, `PAYMONGO_PUBLIC_KEY`).
 2. Register a webhook in the PayMongo Dashboard pointing to:
@@ -66,7 +105,7 @@ curl -X POST http://localhost:3000/api/rfid/scan \
 5. **Public key is required** — QR Ph attach uses `PAYMONGO_PUBLIC_KEY` (same mode as secret key).
 6. Ensure `wallet_topups` table exists in Supabase (from your schema migrations).
 
-## 6. Vercel deploy
+## 7. Vercel deploy
 
 1. Push repo and import into Vercel.
 2. Set the same env vars as `.env.example`.
@@ -82,3 +121,5 @@ curl -X POST http://localhost:3000/api/rfid/scan \
 - [ ] Google OAuth redirect allowlist updated
 - [ ] PWA manifest loads (`/manifest.webmanifest`)
 - [ ] PayMongo webhook URL registered and `PAYMONGO_*` env vars set on Vercel
+- [ ] `NEXT_PUBLIC_ADMIN_APP_URL` set for staff Reservations link
+- [ ] Admin ↔ member parity tests passed (closures, walk-in, FCFS booking)

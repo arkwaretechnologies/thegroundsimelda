@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { mapBookingErrorMessage } from "@/lib/booking/court-availability";
 
 const schema = z.object({
   court_id: z.string().uuid(),
@@ -31,7 +32,10 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(
+      { error: mapBookingErrorMessage(error.message) },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ booking: data });

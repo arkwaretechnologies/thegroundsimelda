@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberShell } from "@/components/dashboard/member-shell";
+import { isStaffRole } from "@/lib/staff";
+import type { UserRole } from "@/lib/types/database";
 
 export default async function MemberLayout({
   children,
@@ -16,7 +18,7 @@ export default async function MemberLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url")
+    .select("full_name, avatar_url, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -32,6 +34,7 @@ export default async function MemberLayout({
       name={profile?.full_name ?? user.email}
       avatarUrl={profile?.avatar_url ?? avatarFromAuth}
       email={user.email}
+      isStaff={isStaffRole(profile?.role as UserRole | undefined)}
     >
       {children}
     </MemberShell>

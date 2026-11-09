@@ -30,6 +30,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { manilaToday } from "@/lib/open-play/sessions";
+import { mapBookingErrorMessage } from "@/lib/booking/court-availability";
+import {
+  findBookingConflict,
+  type CourtBookingInterval,
+} from "@/lib/booking/exclusive-availability";
 
 const selectMenuClass = "z-[110]";
 
@@ -44,6 +49,46 @@ type CourtOccupancy = {
   starts_at: string;
   ends_at: string;
 };
+
+type AvailabilitySnapshot = {
+  occupancy: CourtOccupancy[];
+  blocks: CourtOccupancy[];
+};
+
+function buildCourtIntervals(
+  courtId: string,
+  occupancy: CourtOccupancy[],
+  blocks: CourtOccupancy[]
+): CourtBookingInterval[] {
+  const forCourt = (rows: CourtOccupancy[]) =>
+    rows
+      .filter((b) => b.court_id === courtId)
+      .map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at }));
+  return [...forCourt(occupancy), ...forCourt(blocks)];
+}
+
+function exclusiveSlotConflict(
+  courtId: string,
+  selection: ExclusiveSelection,
+  occupancy: CourtOccupancy[],
+  blocks: CourtOccupancy[]
+): boolean {
+  if (selection.hasConflict) return true;
+  const intervals = buildCourtIntervals(courtId, occupancy, blocks);
+  return Boolean(
+    findBookingConflict(
+      selection.startsAt,
+      selection.durationHours,
+      intervals
+    )
+  );
+}
+
+function toastExclusiveSlotUnavailable() {
+  toast.error(
+    "This time is no longer available — your wallet was not charged. Please choose another slot."
+  );
+}
 
 type OpenPlaySession = {
   id: string;
@@ -77,6 +122,7 @@ type OpenPlayRegistrationItem = {
 export function BookingPanel({
   exclusiveCourts,
   courtOccupancy,
+  courtBlocks = [],
   bookings,
   registrations,
   exclusiveFeeCents,
@@ -87,6 +133,7 @@ export function BookingPanel({
 }: {
   exclusiveCourts: Court[];
   courtOccupancy: CourtOccupancy[];
+  courtBlocks?: CourtOccupancy[];
   bookings: Booking[];
   registrations: OpenPlayRegistrationItem[];
   exclusiveFeeCents: number;
@@ -100,6 +147,8 @@ export function BookingPanel({
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [sessionFeeCents, setSessionFeeCents] = useState<number | null>(null);
   const [courtId, setCourtId] = useState(() => exclusiveCourts[0]?.id ?? "");
+  const [liveOccupancy, setLiveOccupancy] = useState(courtOccupancy);
+  const [liveBlocks, setLiveBlocks] = useState(courtBlocks);
   const [exclusiveSelection, setExclusiveSelection] =
     useState<ExclusiveSelection | null>(null);
   const [opDate, setOpDate] = useState(() => manilaToday());
@@ -112,19 +161,49 @@ export function BookingPanel({
     "exclusive" | "open_play" | null
   >(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
+  /** Frozen at “Confirm payment” so refresh/clamp cannot shrink duration before pay. */
+  const [lockedExclusive, setLockedExclusive] = useState<{
+    courtId: string;
+    selection: ExclusiveSelection;
+  } | null>(null);
 
   const slots = useMemo(
     () => buildExclusiveSlots(exclusiveOpenHour, exclusiveCloseHour),
     [exclusiveOpenHour, exclusiveCloseHour]
   );
 
-  const courtBookings = useMemo(
-    () =>
-      courtOccupancy
+  useEffect(() => {
+    setLiveOccupancy(courtOccupancy);
+    setLiveBlocks(courtBlocks);
+  }, [courtOccupancy, courtBlocks]);
+
+  const courtBookings = useMemo(() => {
+    const forCourt = (rows: CourtOccupancy[]) =>
+      rows
         .filter((b) => b.court_id === courtId)
-        .map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
-    [courtOccupancy, courtId]
-  );
+        .map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at }));
+    return [...forCourt(liveOccupancy), ...forCourt(liveBlocks)];
+  }, [liveOccupancy, liveBlocks, courtId]);
+
+  const refreshExclusiveAvailability =
+    useCallback(async (): Promise<AvailabilitySnapshot | null> => {
+      try {
+        const res = await fetch("/api/bookings/availability");
+        const data = await res.json();
+        if (!res.ok) return null;
+        const occupancy = Array.isArray(data.court_occupancy)
+          ? (data.court_occupancy as CourtOccupancy[])
+          : liveOccupancy;
+        const blocks = Array.isArray(data.court_blocks)
+          ? (data.court_blocks as CourtOccupancy[])
+          : liveBlocks;
+        setLiveOccupancy(occupancy);
+        setLiveBlocks(blocks);
+        return { occupancy, blocks };
+      } catch {
+        return null;
+      }
+    }, [liveBlocks, liveOccupancy]);
 
   useEffect(() => {
     setCourtId(exclusiveCourts[0]?.id ?? "");
@@ -209,15 +288,40 @@ export function BookingPanel({
     setPaymentDialogOpen(false);
     setPaymentDialogKind(null);
     setPaymentComplete(false);
+    setLockedExclusive(null);
   }
 
-  function openPaymentDialog(kind: "exclusive" | "open_play") {
+  function snapshotExclusiveSelection(
+    selection: ExclusiveSelection
+  ): ExclusiveSelection {
+    return {
+      ...selection,
+      startsAt: new Date(selection.startsAt),
+      endsAt: new Date(selection.endsAt),
+    };
+  }
+
+  async function openPaymentDialog(kind: "exclusive" | "open_play") {
     if (kind === "exclusive") {
-      if (!courtId || !exclusiveSelection || exclusiveSelection.hasConflict) {
+      const snap = await refreshExclusiveAvailability();
+      const occupancy = snap?.occupancy ?? liveOccupancy;
+      const blocks = snap?.blocks ?? liveBlocks;
+      if (!courtId || !exclusiveSelection) {
         toast.error("Select a valid court, date, and time");
         return;
       }
+      if (
+        exclusiveSlotConflict(courtId, exclusiveSelection, occupancy, blocks)
+      ) {
+        toastExclusiveSlotUnavailable();
+        return;
+      }
+      setLockedExclusive({
+        courtId,
+        selection: snapshotExclusiveSelection(exclusiveSelection),
+      });
     } else {
+      setLockedExclusive(null);
       if (!sessionId) {
         toast.error("Select an open play schedule");
         return;
@@ -236,21 +340,31 @@ export function BookingPanel({
     setPaymentDialogOpen(true);
   }
 
-  async function bookExclusive(): Promise<boolean> {
-    if (!courtId || !exclusiveSelection || exclusiveSelection.hasConflict) {
+  async function bookExclusive(locked: {
+    courtId: string;
+    selection: ExclusiveSelection;
+  }): Promise<boolean> {
+    const { courtId: payCourtId, selection } = locked;
+    if (!payCourtId || selection.hasConflict) {
       return false;
     }
     const res = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        court_id: courtId,
-        starts_at: formatISO(exclusiveSelection.startsAt),
-        ends_at: formatISO(exclusiveSelection.endsAt),
+        court_id: payCourtId,
+        starts_at: formatISO(selection.startsAt),
+        ends_at: formatISO(selection.endsAt),
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Booking failed");
+    if (!res.ok) {
+      throw new Error(
+        mapBookingErrorMessage(
+          typeof data.error === "string" ? data.error : "Booking failed"
+        )
+      );
+    }
     return true;
   }
 
@@ -280,13 +394,37 @@ export function BookingPanel({
   }
 
   async function confirmPaymentFromDialog() {
-    if (!paymentDialogKind) return;
+    if (!paymentDialogKind || loading) return;
     setLoading(true);
     try {
-      const ok =
-        paymentDialogKind === "exclusive"
-          ? await bookExclusive()
-          : await registerOpenPlay();
+      let ok = false;
+      if (paymentDialogKind === "exclusive") {
+        if (!lockedExclusive) {
+          toast.error("Select a court and time again");
+          return;
+        }
+        const snap = await refreshExclusiveAvailability();
+        const occupancy = snap?.occupancy ?? liveOccupancy;
+        const blocks = snap?.blocks ?? liveBlocks;
+        if (
+          exclusiveSlotConflict(
+            lockedExclusive.courtId,
+            lockedExclusive.selection,
+            occupancy,
+            blocks
+          )
+        ) {
+          toastExclusiveSlotUnavailable();
+          setPaymentDialogOpen(false);
+          setPaymentDialogKind(null);
+          setPaymentComplete(false);
+          setLockedExclusive(null);
+          return;
+        }
+        ok = await bookExclusive(lockedExclusive);
+      } else {
+        ok = await registerOpenPlay();
+      }
       if (ok) {
         setPaymentComplete(true);
         if (paymentDialogKind === "open_play") {
@@ -326,8 +464,12 @@ export function BookingPanel({
     registerFeeCents > 0 && walletBalanceCents < registerFeeCents;
 
   const selectedCourt = exclusiveCourts.find((c) => c.id === courtId);
-  const exclusiveTotalCents = exclusiveSelection
-    ? exclusiveSelection.durationHours * exclusiveFeeCents
+  const dialogExclusive =
+    paymentDialogKind === "exclusive" && lockedExclusive
+      ? lockedExclusive.selection
+      : exclusiveSelection;
+  const exclusiveTotalCents = dialogExclusive
+    ? dialogExclusive.durationHours * exclusiveFeeCents
     : 0;
   const dialogFeeCents =
     paymentDialogKind === "exclusive"
@@ -364,26 +506,29 @@ export function BookingPanel({
             </DialogDescription>
           </DialogHeader>
 
-          {paymentDialogKind === "exclusive" && exclusiveSelection ? (
+          {paymentDialogKind === "exclusive" && dialogExclusive ? (
             <ul className="space-y-1.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm">
               <li className="flex justify-between gap-3">
                 <span className="text-muted-foreground">Court</span>
                 <span className="text-right font-medium text-pv-ink">
-                  {selectedCourt?.name ?? "Court"}
+                  {(lockedExclusive
+                    ? exclusiveCourts.find((c) => c.id === lockedExclusive.courtId)
+                    : selectedCourt
+                  )?.name ?? "Court"}
                 </span>
               </li>
               <li className="flex justify-between gap-3">
                 <span className="text-muted-foreground">When</span>
                 <span className="text-right font-medium text-pv-ink">
-                  {formatDate(exclusiveSelection.startsAt)} –{" "}
-                  {formatDate(exclusiveSelection.endsAt)}
+                  {formatDate(dialogExclusive.startsAt)} –{" "}
+                  {formatDate(dialogExclusive.endsAt)}
                 </span>
               </li>
               <li className="flex justify-between gap-3">
                 <span className="text-muted-foreground">Duration</span>
                 <span className="font-medium text-pv-ink">
-                  {exclusiveSelection.durationHours}{" "}
-                  {exclusiveSelection.durationHours === 1 ? "hour" : "hours"}
+                  {dialogExclusive.durationHours}{" "}
+                  {dialogExclusive.durationHours === 1 ? "hour" : "hours"}
                 </span>
               </li>
             </ul>
@@ -533,7 +678,7 @@ export function BookingPanel({
                 />
               </div>
               <Button
-                onClick={() => openPaymentDialog("exclusive")}
+                onClick={() => void openPaymentDialog("exclusive")}
                 disabled={loading || !canBookExclusive}
                 className="min-h-11 w-full touch-manipulation"
               >

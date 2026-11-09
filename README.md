@@ -11,7 +11,8 @@ Member-facing Progressive Web App for **The Grounds** — membership, wallet, an
 - Marketing landing + membership plans
 - Auth (email/password + Google OAuth)
 - Member dashboard: wallet (PayMongo QR Ph top-ups), memberships, bookings, history, notifications
-- Court booking with wallet debit
+- Court booking with wallet debit (public schedule shows open / booked / closed hours)
+- Staff **Reservations** (`/dashboard/reservations`): per-court hour closures and walk-in holds
 - RFID scan webhook (`POST /api/rfid/scan`) for check-in hardware
 - Multi-branch schema ready (`branches` + `NEXT_PUBLIC_DEFAULT_BRANCH_ID`)
 
