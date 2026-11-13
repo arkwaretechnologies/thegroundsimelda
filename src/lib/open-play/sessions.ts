@@ -23,16 +23,11 @@ export type OpenPlaySessionRow = {
   session_courts?: SessionCourtEmbed[];
 };
 
-const SELECTS = [
-  // Rewrite: multi-court junction + optional title / court_id
-  "id, branch_id, title, starts_at, ends_at, status, max_players, court_id, courts(name), session_courts:open_play_session_courts!open_play_session_courts_session_id_fkey(court_id, court:courts!open_play_session_courts_court_id_fkey(id, name, status, is_open_play))",
-  // Junction without title
-  "id, branch_id, starts_at, ends_at, status, max_players, court_id, courts(name), session_courts:open_play_session_courts!open_play_session_courts_session_id_fkey(court_id, court:courts!open_play_session_courts_court_id_fkey(id, name, status, is_open_play))",
-  // Single court_id schema
-  "id, branch_id, starts_at, ends_at, status, max_players, court_id, courts(name)",
-  // Minimal columns only
-  "id, branch_id, starts_at, ends_at, status, max_players",
-] as const;
+const PRIMARY_SELECT =
+  "id, branch_id, title, starts_at, ends_at, status, max_players, court_id, courts(name), session_courts:open_play_session_courts!open_play_session_courts_session_id_fkey(court_id, court:courts!open_play_session_courts_court_id_fkey(id, name, status, is_open_play))";
+
+const FALLBACK_SELECT =
+  "id, branch_id, title, starts_at, ends_at, status, max_players, court_id, courts(name)";
 
 /** Manila has no DST. */
 const MANILA_OFFSET = "+08:00";
@@ -100,9 +95,10 @@ async function querySessions(
   branchId: string,
   applyFilters: (q: SessionQuery) => SessionQuery
 ): Promise<OpenPlaySessionRow[]> {
+  const selects = [PRIMARY_SELECT, FALLBACK_SELECT];
   let lastError: string | null = null;
 
-  for (const select of SELECTS) {
+  for (const select of selects) {
     const base = supabase
       .from("open_play_sessions")
       .select(select)
@@ -169,4 +165,76 @@ export function sessionCourtNames(session: OpenPlaySessionRow): string {
   }
 
   return "Courts TBA";
+}
+
+function asCountMap(
+  rows: { id: string; count: number }[] | null
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows ?? []) {
+    counts.set(row.id, Number(row.count ?? 0));
+  }
+  return counts;
+}
+
+export async function countOpenPlayRegistrations(
+  supabase: SupabaseClient,
+  sessionIds: string[],
+  statuses: string[] = ["registered", "checked_in"]
+): Promise<Map<string, number>> {
+  if (sessionIds.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("open_play_registrations")
+    .select("session_id, count()")
+    .in("session_id", sessionIds)
+    .in("status", statuses);
+  if (!error && data) {
+    return asCountMap(
+      (data as unknown as { session_id: string; count: number }[]).map(
+        (row) => ({ id: row.session_id, count: row.count })
+      )
+    );
+  }
+  const counts = new Map<string, number>();
+  const { data: rows } = await supabase
+    .from("open_play_registrations")
+    .select("session_id")
+    .in("session_id", sessionIds)
+    .in("status", statuses);
+  for (const row of rows ?? []) {
+    counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export async function countTournamentRegistrations(
+  supabase: SupabaseClient,
+  tournamentIds: string[]
+): Promise<Map<string, number>> {
+  if (tournamentIds.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("tournament_registrations")
+    .select("tournament_id, count()")
+    .in("tournament_id", tournamentIds)
+    .neq("status", "withdrawn");
+  if (!error && data) {
+    return asCountMap(
+      (data as unknown as { tournament_id: string; count: number }[]).map(
+        (row) => ({ id: row.tournament_id, count: row.count })
+      )
+    );
+  }
+  const counts = new Map<string, number>();
+  const { data: rows } = await supabase
+    .from("tournament_registrations")
+    .select("tournament_id")
+    .in("tournament_id", tournamentIds)
+    .neq("status", "withdrawn");
+  for (const row of rows ?? []) {
+    counts.set(
+      row.tournament_id,
+      (counts.get(row.tournament_id) ?? 0) + 1
+    );
+  }
+  return counts;
 }

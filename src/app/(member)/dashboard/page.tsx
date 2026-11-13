@@ -17,10 +17,14 @@ export default async function DashboardPage() {
 
   const [{ data: wallet }, { data: membership }, { data: bookings }, { data: notifications }, { data: attendance }, { data: profile }] =
     await Promise.all([
-      supabase.from("wallets").select("*").eq("profile_id", user!.id).maybeSingle(),
+      supabase
+        .from("wallets")
+        .select("balance_cents")
+        .eq("profile_id", user!.id)
+        .maybeSingle(),
       supabase
         .from("memberships")
-        .select("*, membership_plans(name, interval)")
+        .select("ends_at, membership_plans(name, interval)")
         .eq("profile_id", user!.id)
         .eq("status", "active")
         .order("ends_at", { ascending: false })
@@ -28,7 +32,7 @@ export default async function DashboardPage() {
         .maybeSingle(),
       supabase
         .from("bookings")
-        .select("*, courts(name)")
+        .select("id, starts_at, type, courts(name)")
         .eq("profile_id", user!.id)
         .eq("status", "confirmed")
         .gte("starts_at", new Date().toISOString())
@@ -36,13 +40,13 @@ export default async function DashboardPage() {
         .limit(5),
       supabase
         .from("notifications")
-        .select("*")
+        .select("id, title, body")
         .eq("profile_id", user!.id)
         .order("created_at", { ascending: false })
         .limit(5),
       supabase
         .from("attendance_logs")
-        .select("*")
+        .select("id")
         .eq("profile_id", user!.id)
         .order("scanned_at", { ascending: false })
         .limit(5),

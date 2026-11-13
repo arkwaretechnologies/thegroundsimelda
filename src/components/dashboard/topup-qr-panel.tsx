@@ -6,6 +6,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { normalizeQrImageSrc } from "@/lib/paymongo/qr-image";
 import { formatCurrency } from "@/lib/utils";
+import {
+  TOPUP_PAYMONGO_SYNC_EVERY_POLLS,
+  TOPUP_POLL_INTERVAL_MS,
+} from "@/lib/wallet/topup";
 
 export type TopUpQrSession = {
   topup_id: string;
@@ -37,7 +41,7 @@ export function TopUpQrPanel({
   const router = useRouter();
   const expiredNotified = useRef(false);
   const paidHandled = useRef(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [remainingMs, setRemainingMs] = useState(() =>
     Math.max(0, new Date(session.expires_at).getTime() - Date.now())
   );
@@ -66,41 +70,49 @@ export function TopUpQrPanel({
   useEffect(() => {
     if (!active || expired || paidHandled.current) return;
 
-    pollIntervalRef.current = setInterval(async () => {
-      if (paidHandled.current) return;
+    let cancelled = false;
+    let pollCount = 0;
+    let delay = TOPUP_POLL_INTERVAL_MS;
+
+    const tick = async () => {
+      if (cancelled || paidHandled.current) return;
+      pollCount += 1;
+      const sync =
+        pollCount % TOPUP_PAYMONGO_SYNC_EVERY_POLLS === 0 ? "&sync=1" : "";
       try {
-        const res = await fetch(`/api/wallet/topup/${session.topup_id}`);
+        const res = await fetch(
+          `/api/wallet/topup/${session.topup_id}?poll=1${sync}`
+        );
         const data = await res.json();
-        if (!res.ok) return;
+        if (!res.ok || cancelled || paidHandled.current) return;
         const status = data.topup?.status as string | undefined;
         if (status === "paid") {
-          if (paidHandled.current) return;
           paidHandled.current = true;
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
           onPaid(session.amount_cents);
           router.refresh();
-        } else if (status === "failed" || status === "expired") {
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-          }
+          return;
+        }
+        if (status === "failed" || status === "expired") {
           toast.error(
             status === "expired" ? "QR expired — try again" : "Payment failed"
           );
           onExpired?.();
           router.refresh();
+          return;
         }
       } catch {
         /* ignore poll errors */
       }
-    }, 2000);
+      delay = Math.min(delay + 1000, 8000);
+      pollIntervalRef.current = setTimeout(tick, delay);
+    };
+
+    pollIntervalRef.current = setTimeout(tick, delay);
 
     return () => {
+      cancelled = true;
       if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
+        clearTimeout(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
     };

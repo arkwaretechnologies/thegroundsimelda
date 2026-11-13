@@ -1,6 +1,12 @@
 /** PayMongo QR Ph validity (seconds). */
 export const QR_EXPIRY_SECONDS = 600;
 
+/** Client poll interval while a QR is open (webhook is primary). */
+export const TOPUP_POLL_INTERVAL_MS = 4000;
+
+/** How often a poll may call PayMongo as a webhook fallback. */
+export const TOPUP_PAYMONGO_SYNC_EVERY_POLLS = 4;
+
 export type WalletTopupStatus = "pending" | "paid" | "failed" | "expired";
 
 /** Caps legacy 30-minute rows to the current 10-minute policy. */

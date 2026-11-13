@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { resolveMemberBranchId } from "@/lib/branch";
 import {
+  countOpenPlayRegistrations,
   listMemberOpenPlaySessionsForDate,
   sessionCourtNames,
 } from "@/lib/open-play/sessions";
@@ -49,31 +50,17 @@ export async function GET(request: Request) {
   let myRegBySession: Record<string, string> = {};
 
   if (sessionIds.length > 0) {
-    const [{ data: regCounts, error: regCountError }, { data: myRegs, error: myRegError }] =
-      await Promise.all([
-        supabase
-          .from("open_play_registrations")
-          .select("session_id")
-          .in("session_id", sessionIds)
-          .in("status", ["registered", "checked_in"]),
-        supabase
-          .from("open_play_registrations")
-          .select("session_id, status")
-          .eq("profile_id", user.id)
-          .in("session_id", sessionIds)
-          .neq("status", "cancelled"),
-      ]);
+    const [counts, { data: myRegs, error: myRegError }] = await Promise.all([
+      countOpenPlayRegistrations(supabase, sessionIds),
+      supabase
+        .from("open_play_registrations")
+        .select("session_id, status")
+        .eq("profile_id", user.id)
+        .in("session_id", sessionIds)
+        .neq("status", "cancelled"),
+    ]);
 
-    // If registrations table is missing, still return schedules with zero counts.
-    if (!regCountError) {
-      countBySession = (regCounts ?? []).reduce<Record<string, number>>(
-        (acc, row) => {
-          acc[row.session_id] = (acc[row.session_id] ?? 0) + 1;
-          return acc;
-        },
-        {}
-      );
-    }
+    countBySession = Object.fromEntries(counts);
 
     if (!myRegError) {
       myRegBySession = (myRegs ?? []).reduce<Record<string, string>>(

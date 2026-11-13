@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { buildExclusiveSlots } from "@/lib/booking/exclusive-slots";
 import {
   ExclusiveSlotCalendar,
   type ExclusiveSelection,
@@ -166,11 +165,6 @@ export function BookingPanel({
     courtId: string;
     selection: ExclusiveSelection;
   } | null>(null);
-
-  const slots = useMemo(
-    () => buildExclusiveSlots(exclusiveOpenHour, exclusiveCloseHour),
-    [exclusiveOpenHour, exclusiveCloseHour]
-  );
 
   useEffect(() => {
     setLiveOccupancy(courtOccupancy);
@@ -670,9 +664,9 @@ export function BookingPanel({
               <div className="space-y-2">
                 <Label>Date & time</Label>
                 <ExclusiveSlotCalendar
-                  slots={slots}
                   courtBookings={courtBookings}
                   exclusiveFeeCents={exclusiveFeeCents}
+                  openHour={exclusiveOpenHour}
                   closeHour={exclusiveCloseHour}
                   onSelectionChange={handleExclusiveSelection}
                 />

@@ -17,35 +17,36 @@ export default async function HistoryPage() {
     await Promise.all([
       supabase
         .from("attendance_logs")
-        .select("*")
+        .select("id, event, scanned_at")
         .eq("profile_id", user!.id)
         .order("scanned_at", { ascending: false })
         .limit(40),
       supabase
         .from("bookings")
-        .select("*, courts(name)")
+        .select("id, starts_at, status, courts(name)")
         .eq("profile_id", user!.id)
         .order("starts_at", { ascending: false })
         .limit(40),
       supabase.from("wallets").select("id").eq("profile_id", user!.id).maybeSingle(),
     ]);
 
-  const { data: txs } = wallet
-    ? await supabase
-        .from("wallet_transactions")
-        .select("id, type, amount_cents, reference, created_at")
-        .eq("wallet_id", wallet.id)
-        .order("created_at", { ascending: false })
-        .limit(40)
-    : { data: [] };
-
-  const { data: topups } = await supabase
-    .from("wallet_topups")
-    .select("id, amount_cents, status, qr_expires_at, created_at")
-    .eq("profile_id", user!.id)
-    .neq("status", "paid")
-    .order("created_at", { ascending: false })
-    .limit(40);
+  const [{ data: txs }, { data: topups }] = await Promise.all([
+    wallet
+      ? supabase
+          .from("wallet_transactions")
+          .select("id, type, amount_cents, reference, created_at")
+          .eq("wallet_id", wallet.id)
+          .order("created_at", { ascending: false })
+          .limit(40)
+      : Promise.resolve({ data: [] as never[] }),
+    supabase
+      .from("wallet_topups")
+      .select("id, amount_cents, status, qr_expires_at, created_at")
+      .eq("profile_id", user!.id)
+      .neq("status", "paid")
+      .order("created_at", { ascending: false })
+      .limit(40),
+  ]);
 
   return (
     <div>

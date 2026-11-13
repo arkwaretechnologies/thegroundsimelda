@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import {
-  type ExclusiveSlot,
+  buildExclusiveSlotsForMonth,
   groupExclusiveSlotsByDate,
   formatSlotTime,
 } from "@/lib/booking/exclusive-slots";
@@ -80,31 +80,38 @@ function formatSelectedDate(dateKey: string) {
 }
 
 export function ExclusiveSlotCalendar({
-  slots,
   courtBookings,
   exclusiveFeeCents,
+  openHour,
   closeHour,
   onSelectionChange,
 }: {
-  slots: ExclusiveSlot[];
   courtBookings: CourtBookingInterval[];
   exclusiveFeeCents: number;
+  openHour: number;
   closeHour: number;
   onSelectionChange: (selection: ExclusiveSelection | null) => void;
 }) {
-  const byDate = useMemo(() => groupExclusiveSlotsByDate(slots), [slots]);
-  const dateKeys = useMemo(() => [...byDate.keys()].sort(), [byDate]);
-
-  const firstSlot = slots[0];
-  const initialMonth = firstSlot
-    ? manilaParts(firstSlot.startsAt)
-    : manilaParts(new Date());
+  const initialMonth = manilaParts(new Date());
 
   const [viewYear, setViewYear] = useState(initialMonth.year);
   const [viewMonth, setViewMonth] = useState(initialMonth.month);
-  const [selectedDateKey, setSelectedDateKey] = useState(dateKeys[0] ?? "");
+  const [selectedDateKey, setSelectedDateKey] = useState("");
   const [startSlotId, setStartSlotId] = useState("");
   const [durationHours, setDurationHours] = useState(1);
+
+  const slots = useMemo(
+    () =>
+      buildExclusiveSlotsForMonth(
+        openHour,
+        closeHour,
+        viewYear,
+        viewMonth
+      ),
+    [openHour, closeHour, viewYear, viewMonth]
+  );
+  const byDate = useMemo(() => groupExclusiveSlotsByDate(slots), [slots]);
+  const dateKeys = useMemo(() => [...byDate.keys()].sort(), [byDate]);
 
   const daySlots = useMemo(
     () => byDate.get(selectedDateKey) ?? [],
@@ -207,14 +214,6 @@ export function ExclusiveSlotCalendar({
   function dateKeyForDay(day: number) {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${viewYear}-${pad(viewMonth)}-${pad(day)}`;
-  }
-
-  if (slots.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No slots available in booking hours.
-      </p>
-    );
   }
 
   return (

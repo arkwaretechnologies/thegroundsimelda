@@ -46,3 +46,22 @@ Operational tables are keyed by `branch_id`. This app uses `NEXT_PUBLIC_DEFAULT_
 - `api/*` — member mutations + RFID webhook
 
 Shared UI lives in `components/ui` and `components/shared`.
+
+## Performance
+
+Optimizations target **request volume** (Vercel + Auth + PayMongo), not extra infrastructure. No Redis, queues, or workers.
+
+| Area | Before | After (measured in-repo) |
+|---|---|---|
+| Middleware `getUser()` | Every non-static path (marketing, APIs, RFID, webhooks) | `/dashboard`, `/login`, `/signup`, `/auth` only. APIs still call `getUser()` themselves. |
+| Dashboard navigation | Middleware + layout + page = 3 Auth checks | Same 3 on `/dashboard`; **0** middleware Auth on marketing and `/api/*` |
+| Wallet QR poll | Every **2s**, PayMongo on every poll, QR payload re-sent | **4s** with backoff to 8s; `?poll=1` skips QR; PayMongo only every 4th poll (`&sync=1`). Webhook remains the credit path. ~30 req/min → ~15 then fewer. |
+| Exclusive slot generation | 90-day hour walk + `toLocaleString` per slot | Visible month only. Microbench (`npm run bench:slots`, 2026-11-13): **310ms / 1440 objects** vs **1.7ms / 281 objects**. |
+| Open Play list | Up to 4 sequential select fallbacks | Primary junction select + one fallback |
+| Availability query | All future confirmed bookings | Bounded to `BOOKING_DAYS_AHEAD` |
+| Public courts/settings | Queried every ISR | `unstable_cache` 60s TTL |
+| Postgres | RLS `auth.uid()` per row; missing `bookings.profile_id` / `wallet_transactions.wallet_id` indexes | `(select auth.uid())` initplan; query-backed indexes; staff court-block policy is INSERT/UPDATE/DELETE only |
+
+Production CPU % / p95 function duration: compare Vercel invocation counts for `/api/wallet/topup/[id]` and middleware, plus Supabase query insights — not claimed here.
+
+Run `npm run bench:slots` after slot-generator changes.

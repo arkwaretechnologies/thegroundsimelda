@@ -4,10 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_BRANCH_ID } from "@/lib/types/database";
 import {
+  countOpenPlayRegistrations,
+  countTournamentRegistrations,
   listMemberOpenPlaySessions,
   sessionCourtNames,
 } from "@/lib/open-play/sessions";
 import { BOOKING_DAYS_AHEAD } from "@/lib/booking/exclusive-slots";
+import { fetchCourtScheduleSnapshot } from "@/lib/booking/fetch-court-schedule";
 
 /**
  * Public, anonymised schedule data for the marketing page.
@@ -76,35 +79,8 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
       now.getTime() + (BOOKING_DAYS_AHEAD + 1) * 86400000
     );
 
-    const [courtsRes, busyRes, blocksRes, settingsRes, sessionRows] = await Promise.all([
-      supabase
-        .from("courts")
-        .select("id, name")
-        .eq("branch_id", branchId)
-        .eq("is_exclusive", true)
-        .eq("status", "available")
-        .order("sort_order"),
-      supabase
-        .from("bookings")
-        .select("court_id, starts_at, ends_at")
-        .eq("branch_id", branchId)
-        .eq("type", "exclusive")
-        .eq("status", "confirmed")
-        .gte("ends_at", now.toISOString())
-        .lt("starts_at", until.toISOString()),
-      supabase
-        .from("court_schedule_blocks")
-        .select("court_id, starts_at, ends_at")
-        .eq("branch_id", branchId)
-        .gte("ends_at", now.toISOString())
-        .lt("starts_at", until.toISOString()),
-      supabase
-        .from("branch_settings")
-        .select(
-          "exclusive_open_hour, exclusive_close_hour, exclusive_court_fee_cents, default_open_play_fee_cents"
-        )
-        .eq("branch_id", branchId)
-        .maybeSingle(),
+    const [snapshot, sessionRows] = await Promise.all([
+      fetchCourtScheduleSnapshot(supabase, branchId, now, until),
       listMemberOpenPlaySessions(supabase, branchId).catch(() => []),
     ]);
 
@@ -112,26 +88,25 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
       (s) => new Date(s.starts_at) < until
     );
 
-    const counts = new Map<string, number>();
-    if (sessions.length) {
-      const { data: regs } = await supabase
-        .from("open_play_registrations")
-        .select("session_id")
-        .in(
-          "session_id",
+    const counts = sessions.length
+      ? await countOpenPlayRegistrations(
+          supabase,
           sessions.map((s) => s.id)
         )
-        .neq("status", "cancelled");
-      for (const r of regs ?? []) {
-        counts.set(r.session_id, (counts.get(r.session_id) ?? 0) + 1);
-      }
-    }
+      : new Map<string, number>();
 
-    const s = settingsRes.data;
     return {
-      courts: courtsRes.data ?? [],
-      busy: busyRes.data ?? [],
-      blocks: blocksRes.error ? [] : blocksRes.data ?? [],
+      courts: snapshot.courts.map((c) => ({ id: c.id, name: c.name })),
+      busy: snapshot.bookings.map((row) => ({
+        court_id: row.court_id!,
+        starts_at: row.starts_at,
+        ends_at: row.ends_at,
+      })),
+      blocks: snapshot.blocks.map((row) => ({
+        court_id: row.court_id!,
+        starts_at: row.starts_at,
+        ends_at: row.ends_at,
+      })),
       sessions: sessions.map((row) => ({
         id: row.id,
         title: row.title ?? "Open Play",
@@ -141,12 +116,10 @@ export async function getPublicSchedule(): Promise<PublicSchedule> {
         max_players: row.max_players,
         registered: counts.get(row.id) ?? 0,
       })),
-      openHour: s?.exclusive_open_hour ?? EMPTY_SCHEDULE.openHour,
-      closeHour: s?.exclusive_close_hour ?? EMPTY_SCHEDULE.closeHour,
-      exclusiveFeeCents:
-        s?.exclusive_court_fee_cents ?? EMPTY_SCHEDULE.exclusiveFeeCents,
-      openPlayFeeCents:
-        s?.default_open_play_fee_cents ?? EMPTY_SCHEDULE.openPlayFeeCents,
+      openHour: snapshot.openHour,
+      closeHour: snapshot.closeHour,
+      exclusiveFeeCents: snapshot.exclusiveFeeCents,
+      openPlayFeeCents: snapshot.openPlayFeeCents,
     };
   } catch {
     return EMPTY_SCHEDULE;
@@ -167,18 +140,10 @@ export async function getPublicTournaments(): Promise<PublicTournament[]> {
       .limit(6);
     if (error || !data?.length) return [];
 
-    const counts = new Map<string, number>();
-    const { data: regs } = await supabase
-      .from("tournament_registrations")
-      .select("tournament_id")
-      .in(
-        "tournament_id",
-        data.map((t) => t.id)
-      )
-      .neq("status", "withdrawn");
-    for (const r of regs ?? []) {
-      counts.set(r.tournament_id, (counts.get(r.tournament_id) ?? 0) + 1);
-    }
+    const counts = await countTournamentRegistrations(
+      supabase,
+      data.map((t) => t.id)
+    );
 
     return data.map((t) => ({
       ...t,

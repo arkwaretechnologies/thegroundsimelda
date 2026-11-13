@@ -59,7 +59,7 @@ function PendingTopupBody({
 
     (async () => {
       try {
-        const res = await fetch(`/api/wallet/topup/${topupId}`);
+        const res = await fetch(`/api/wallet/topup/${topupId}?sync=1`);
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) {

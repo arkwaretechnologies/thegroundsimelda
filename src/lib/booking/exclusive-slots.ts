@@ -1,5 +1,3 @@
-import { addHours } from "date-fns";
-
 const MANILA = "Asia/Manila";
 
 /** How far ahead members (and public schedule) can book exclusive courts. */
@@ -11,23 +9,6 @@ export type ExclusiveSlot = {
   startsAt: Date;
   endsAt: Date;
 };
-
-function manilaHour(date: Date): number {
-  const hour = new Intl.DateTimeFormat("en-GB", {
-    timeZone: MANILA,
-    hour: "numeric",
-    hour12: false,
-  }).format(date);
-  return Number(hour);
-}
-
-function isOnTheHourUtc(date: Date): boolean {
-  return (
-    date.getUTCMinutes() === 0 &&
-    date.getUTCSeconds() === 0 &&
-    date.getUTCMilliseconds() === 0
-  );
-}
 
 export function manilaDateKey(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: MANILA });
@@ -41,6 +22,18 @@ export function formatSlotTime(date: Date): string {
   });
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function dateKey(year: number, month: number, day: number): string {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function manilaHourStart(dayKey: string, hour: number): Date {
+  return new Date(`${dayKey}T${pad2(hour)}:00:00+08:00`);
+}
+
 export function groupExclusiveSlotsByDate(
   slots: ExclusiveSlot[]
 ): Map<string, ExclusiveSlot[]> {
@@ -51,53 +44,74 @@ export function groupExclusiveSlotsByDate(
     list.push(slot);
     map.set(key, list);
   }
-  for (const list of map.values()) {
-    list.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-  }
   return map;
+}
+
+function addDaysKey(dayKey: string, days: number): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  return dateKey(
+    next.getUTCFullYear(),
+    next.getUTCMonth() + 1,
+    next.getUTCDate()
+  );
+}
+
+/** On-the-hour slots for one Manila calendar month (bookable window only). */
+export function buildExclusiveSlotsForMonth(
+  openHour: number,
+  closeHour: number,
+  year: number,
+  month: number,
+  now = new Date(),
+  daysAhead = BOOKING_DAYS_AHEAD
+): ExclusiveSlot[] {
+  const todayKey = manilaDateKey(now);
+  const lastKey = addDaysKey(todayKey, daysAhead);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const slots: ExclusiveSlot[] = [];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = dateKey(year, month, day);
+    if (key < todayKey || key > lastKey) continue;
+    for (let hour = openHour; hour < closeHour; hour++) {
+      const startsAt = manilaHourStart(key, hour);
+      if (startsAt <= now) continue;
+      slots.push({
+        id: startsAt.toISOString(),
+        label: "",
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 3600000),
+      });
+    }
+  }
+
+  return slots;
 }
 
 /** On-the-hour slots within branch exclusive hours (matches create_booking rules). */
 export function buildExclusiveSlots(
   openHour: number,
   closeHour: number,
-  daysAhead = BOOKING_DAYS_AHEAD
+  daysAhead = BOOKING_DAYS_AHEAD,
+  now = new Date()
 ): ExclusiveSlot[] {
-  const hoursPerDay = Math.max(0, closeHour - openHour);
-  const maxSlots = hoursPerDay * daysAhead;
+  const today = manilaDateKey(now);
+  const [y, m] = today.split("-").map(Number);
+  const last = addDaysKey(today, daysAhead);
+  const [ly, lm] = last.split("-").map(Number);
   const slots: ExclusiveSlot[] = [];
-  const now = new Date();
-  const cursor = new Date(now);
-  cursor.setUTCMinutes(0, 0, 0);
-  cursor.setUTCHours(cursor.getUTCHours() + 1);
-
-  const maxIterations = 24 * daysAhead + 24;
-
-  for (let i = 0; i < maxIterations && slots.length < maxSlots; i++) {
-    const startsAt = addHours(cursor, i);
-    if (startsAt <= now) continue;
-    if (!isOnTheHourUtc(startsAt)) continue;
-
-    const hour = manilaHour(startsAt);
-    if (hour < openHour || hour >= closeHour) continue;
-
-    const endsAt = addHours(startsAt, 1);
-    const label = startsAt.toLocaleString("en-PH", {
-      timeZone: MANILA,
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-
-    slots.push({
-      id: startsAt.toISOString(),
-      label,
-      startsAt,
-      endsAt,
-    });
+  let year = y;
+  let month = m;
+  while (year < ly || (year === ly && month <= lm)) {
+    slots.push(
+      ...buildExclusiveSlotsForMonth(openHour, closeHour, year, month, now, daysAhead)
+    );
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
   }
-
   return slots;
 }

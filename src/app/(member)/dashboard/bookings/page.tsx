@@ -24,7 +24,7 @@ export default async function BookingsPage() {
     await Promise.all([
       supabase
         .from("bookings")
-        .select("*, courts(name)")
+        .select("id, starts_at, ends_at, type, fee_cents, courts(name)")
         .eq("profile_id", user!.id)
         .order("starts_at", { ascending: false })
         .limit(20),

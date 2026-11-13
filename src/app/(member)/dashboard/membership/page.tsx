@@ -16,7 +16,7 @@ export default async function MembershipPage() {
   const [{ data: membership }, { data: plans }] = await Promise.all([
     supabase
       .from("memberships")
-      .select("*, membership_plans(name, interval)")
+      .select("ends_at, membership_plans(name, interval)")
       .eq("profile_id", user!.id)
       .eq("status", "active")
       .order("ends_at", { ascending: false })
@@ -24,7 +24,7 @@ export default async function MembershipPage() {
       .maybeSingle(),
     supabase
       .from("membership_plans")
-      .select("*")
+      .select("id, name, interval, price_cents, open_play_fee_cents, perks")
       .eq("branch_id", DEFAULT_BRANCH_ID)
       .eq("active", true)
       .order("price_cents"),

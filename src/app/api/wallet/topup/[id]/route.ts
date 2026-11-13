@@ -12,9 +12,14 @@ import {
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
     const { id } = await params;
+    const url = new URL(request.url);
+    const poll = url.searchParams.get("poll") === "1";
+    const syncPaymongo = url.searchParams.get("sync") === "1";
+    const includeQr = !poll || url.searchParams.get("qr") === "1";
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -53,7 +58,11 @@ export async function GET(_request: Request, { params }: Params) {
         .eq("id", data.id)
         .eq("status", "pending");
       status = "expired";
-    } else if (status === "pending" && data.payment_intent_id) {
+    } else if (
+      status === "pending" &&
+      data.payment_intent_id &&
+      syncPaymongo
+    ) {
       try {
         const admin = createAdminClient();
         const sync = await syncTopupFromPayMongo(admin, {
@@ -78,11 +87,11 @@ export async function GET(_request: Request, { params }: Params) {
     );
     let qrImageUrl: string | null = null;
 
-    if (effectiveStatus === "pending") {
+    if (includeQr && effectiveStatus === "pending") {
       qrImageUrl = data.qr_image_url
         ? normalizeQrImageSrc(data.qr_image_url)
         : null;
-      if (!qrImageUrl && data.payment_intent_id) {
+      if (!qrImageUrl && data.payment_intent_id && syncPaymongo) {
         try {
           const intent = await getPaymentIntent(data.payment_intent_id);
           const raw =

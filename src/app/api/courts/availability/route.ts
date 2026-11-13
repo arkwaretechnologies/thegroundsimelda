@@ -69,13 +69,20 @@ export async function GET(request: Request) {
             : "available",
     }));
 
-    return NextResponse.json({
-      date: dayKey,
-      open_hour: snapshot.openHour,
-      close_hour: snapshot.closeHour,
-      courts: snapshot.courts,
-      hours,
-    });
+    return NextResponse.json(
+      {
+        date: dayKey,
+        open_hour: snapshot.openHour,
+        close_hour: snapshot.closeHour,
+        courts: snapshot.courts,
+        hours,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not load availability";
     return NextResponse.json({ error: message }, { status: 500 });
