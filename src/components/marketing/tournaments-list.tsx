@@ -5,6 +5,8 @@ import { Trophy, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Spotlight } from "@/components/motion/primitives";
 import type { PublicTournament } from "@/lib/marketing/public-schedule";
+import { getFeaturedTournament } from "@/lib/marketing/featured-tournament";
+import { FeaturedRegMyTournaTournament } from "@/components/marketing/featured-regmytourna-tournament";
 
 const MANILA = "Asia/Manila";
 
@@ -47,36 +49,36 @@ function dateParts(iso: string | null) {
   };
 }
 
-export function TournamentsList({ tournaments }: { tournaments: PublicTournament[] }) {
-  if (tournaments.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-60px" }}
-        transition={{ duration: 0.5 }}
-        className="relative mx-auto max-w-2xl overflow-hidden rounded-[1.75rem] border border-[rgba(212,168,69,0.3)] bg-black px-6 py-14 text-center"
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_70%_at_50%_0%,rgba(212,168,69,0.18),transparent_70%)]"
-        />
-        <div className="relative">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[rgba(212,168,69,0.45)] bg-[rgba(212,168,69,0.08)]">
-            <Trophy className="h-6 w-6 text-[#f3d27a]" />
-          </div>
-          <h3 className="text-gold mt-5 text-2xl font-semibold">
-            The next championship is coming
-          </h3>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-            No tournaments are open right now. New events are announced here
-            first — check back soon or ask our staff at the front desk.
-          </p>
+function EmptyTournamentsPlaceholder() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5 }}
+      className="relative mx-auto max-w-2xl overflow-hidden rounded-[1.75rem] border border-[rgba(212,168,69,0.3)] bg-black px-6 py-14 text-center"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_70%_at_50%_0%,rgba(212,168,69,0.18),transparent_70%)]"
+      />
+      <div className="relative">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[rgba(212,168,69,0.45)] bg-[rgba(212,168,69,0.08)]">
+          <Trophy className="h-6 w-6 text-[#f3d27a]" />
         </div>
-      </motion.div>
-    );
-  }
+        <h3 className="text-gold mt-5 text-2xl font-semibold">
+          The next championship is coming
+        </h3>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+          No tournaments are open right now. New events are announced here
+          first — check back soon or ask our staff at the front desk.
+        </p>
+      </div>
+    </motion.div>
+  );
+}
 
+function DbTournamentGrid({ tournaments }: { tournaments: PublicTournament[] }) {
   return (
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
       {tournaments.map((t, i) => {
@@ -93,64 +95,100 @@ export function TournamentsList({ tournaments }: { tournaments: PublicTournament
             className="glass overflow-hidden rounded-2xl transition-colors duration-500 hover:border-[rgba(212,168,69,0.45)]"
           >
             <Spotlight className="flex h-full flex-col rounded-2xl" size={320}>
-            <div className="flex items-center gap-4 border-b border-[rgba(212,168,69,0.18)] bg-[linear-gradient(135deg,rgba(15,61,38,0.7),rgba(0,0,0,0.4))] p-5">
-              <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl border border-[rgba(212,168,69,0.45)] bg-black/50">
-                {start ? (
-                  <>
-                    <span className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[#f3d27a]">
-                      {start.month}
-                    </span>
-                    <span className="font-[family-name:var(--font-cinzel)] text-2xl font-semibold leading-none">
-                      {start.day}
-                    </span>
-                  </>
-                ) : (
-                  <Trophy className="h-6 w-6 text-[#f3d27a]" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <span
-                  className={`inline-block rounded-full px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider ${status.className}`}
-                >
-                  {status.label}
-                </span>
-                <h3 className="mt-2 truncate text-lg font-semibold">{t.name}</h3>
-              </div>
-            </div>
-            <div className="flex flex-1 flex-col p-5">
-              {t.description ? (
-                <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                  {t.description}
-                </p>
-              ) : null}
-              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-white/45">Format</dt>
-                  <dd className="mt-0.5">{FORMAT_LABEL[t.format] ?? t.format}</dd>
+              <div className="flex items-center gap-4 border-b border-[rgba(212,168,69,0.18)] bg-[linear-gradient(135deg,rgba(15,61,38,0.7),rgba(0,0,0,0.4))] p-5">
+                <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl border border-[rgba(212,168,69,0.45)] bg-black/50">
+                  {start ? (
+                    <>
+                      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[#f3d27a]">
+                        {start.month}
+                      </span>
+                      <span className="font-[family-name:var(--font-cinzel)] text-2xl font-semibold leading-none">
+                        {start.day}
+                      </span>
+                    </>
+                  ) : (
+                    <Trophy className="h-6 w-6 text-[#f3d27a]" />
+                  )}
                 </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wider text-white/45">Entry</dt>
-                  <dd className="mt-0.5 text-[#f3d27a]">
-                    {t.entry_fee_cents ? formatCurrency(t.entry_fee_cents) : "Free"}
-                  </dd>
+                <div className="min-w-0">
+                  <span
+                    className={`inline-block rounded-full px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider ${status.className}`}
+                  >
+                    {status.label}
+                  </span>
+                  <h3 className="mt-2 truncate text-lg font-semibold">
+                    {t.name}
+                  </h3>
                 </div>
-                {start ? (
-                  <div className="col-span-2">
-                    <dt className="text-xs uppercase tracking-wider text-white/45">Starts</dt>
-                    <dd className="mt-0.5">{start.full}</dd>
-                  </div>
+              </div>
+              <div className="flex flex-1 flex-col p-5">
+                {t.description ? (
+                  <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                    {t.description}
+                  </p>
                 ) : null}
-              </dl>
-              <p className="mt-auto flex items-center gap-1.5 pt-5 text-xs text-muted-foreground">
-                <Users className="h-3.5 w-3.5 text-[#f3d27a]" />
-                {t.registered}/{t.max_players} players
-                {t.status === "registration" ? ` · ${left} spots left` : ""}
-              </p>
-            </div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wider text-white/45">
+                      Format
+                    </dt>
+                    <dd className="mt-0.5">
+                      {FORMAT_LABEL[t.format] ?? t.format}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wider text-white/45">
+                      Entry
+                    </dt>
+                    <dd className="mt-0.5 text-[#f3d27a]">
+                      {t.entry_fee_cents
+                        ? formatCurrency(t.entry_fee_cents)
+                        : "Free"}
+                    </dd>
+                  </div>
+                  {start ? (
+                    <div className="col-span-2">
+                      <dt className="text-xs uppercase tracking-wider text-white/45">
+                        Starts
+                      </dt>
+                      <dd className="mt-0.5">{start.full}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                <p className="mt-auto flex items-center gap-1.5 pt-5 text-xs text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 text-[#f3d27a]" />
+                  {t.registered}/{t.max_players} players
+                  {t.status === "registration" ? ` · ${left} spots left` : ""}
+                </p>
+              </div>
             </Spotlight>
           </motion.article>
         );
       })}
+    </div>
+  );
+}
+
+export function TournamentsList({ tournaments }: { tournaments: PublicTournament[] }) {
+  const featured = getFeaturedTournament();
+
+  if (!featured && tournaments.length === 0) {
+    return <EmptyTournamentsPlaceholder />;
+  }
+
+  return (
+    <div className="space-y-12">
+      {featured ? <FeaturedRegMyTournaTournament tournament={featured} /> : null}
+      {tournaments.length > 0 ? (
+        <div className="space-y-6">
+          {featured ? (
+            <h3 className="text-center text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
+              More at The Grounds
+            </h3>
+          ) : null}
+          <DbTournamentGrid tournaments={tournaments} />
+        </div>
+      ) : null}
     </div>
   );
 }
